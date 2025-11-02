@@ -219,14 +219,32 @@ const ConditionQuestions = ({ basePrice, deviceName, releaseDate, variantId, bra
     let price = basePriceFromAge;
     let totalDeduction = 0;
 
+    // Step 1: Apply condition-based percentage deduction
+    let conditionPercentageDeduction = 0;
+    if (overallCondition === 'good') {
+      conditionPercentageDeduction = parseFloat(warrantyPrices.condition_good_deduction_pct || 0);
+    } else if (overallCondition === 'average') {
+      conditionPercentageDeduction = parseFloat(warrantyPrices.condition_average_deduction_pct || 0);
+    } else if (overallCondition === 'below-average') {
+      conditionPercentageDeduction = parseFloat(warrantyPrices.condition_below_average_deduction_pct || 0);
+    }
+
+    if (conditionPercentageDeduction > 0) {
+      const conditionAmountDeduction = (price * conditionPercentageDeduction) / 100;
+      price = price - conditionAmountDeduction;
+      console.log(`📉 Condition "${overallCondition}": -${conditionPercentageDeduction}% (-₹${Math.round(conditionAmountDeduction)})`);
+      totalDeduction += conditionAmountDeduction;
+    }
+
+    // Step 2: Apply accessory-based fixed amount deductions
     const chargerDeduction = parseFloat(warrantyPrices.charger_deduction_amount || 0);
     const boxDeduction = parseFloat(warrantyPrices.box_deduction_amount || 0);
     const billDeduction = parseFloat(warrantyPrices.bill_deduction_amount || 0);
 
     // If "None" is selected, deduct ALL amounts
     if (hasNoneSelected) {
-      totalDeduction = chargerDeduction + boxDeduction + billDeduction;
-      console.log(`📉 No accessories: -₹${totalDeduction} (all deductions applied)`);
+      totalDeduction += chargerDeduction + boxDeduction + billDeduction;
+      console.log(`📉 No accessories: -₹${chargerDeduction + boxDeduction + billDeduction} (all deductions applied)`);
     } else {
       // Apply individual deductions
       if (hasOriginalCharger === false) {
@@ -243,13 +261,21 @@ const ConditionQuestions = ({ basePrice, deviceName, releaseDate, variantId, bra
       }
     }
 
-    if (totalDeduction > 0) {
-      price = price - totalDeduction;
-      console.log(`💰 Total deduction: ₹${Math.round(totalDeduction)}`);
+    // Apply accessory deductions to the price
+    if (chargerDeduction > 0 || boxDeduction > 0 || billDeduction > 0) {
+      let accessoryDeduction = 0;
+      if (hasNoneSelected) {
+        accessoryDeduction = chargerDeduction + boxDeduction + billDeduction;
+      } else {
+        if (hasOriginalCharger === false) accessoryDeduction += chargerDeduction;
+        if (hasOriginalBox === false) accessoryDeduction += boxDeduction;
+        if (hasPurchaseBill === false) accessoryDeduction += billDeduction;
+      }
+      price = price - accessoryDeduction;
     }
 
     const roundedPrice = Math.round(price);
-    console.log('💰 Final price after deductions:', roundedPrice);
+    console.log('💰 Final price after all deductions:', roundedPrice, `(Total deduction: ₹${Math.round(totalDeduction)})`);
     setFinalPrice(roundedPrice);
   };
 
